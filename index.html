@@ -1,0 +1,256 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hybrid AI Assistant</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f3f5fb;
+            color: #1f2937;
+        }
+
+        .container {
+            max-width: 850px;
+            margin: 40px auto;
+            padding: 24px;
+        }
+
+        h1 {
+            margin-bottom: 8px;
+            color: #4338ca;
+        }
+
+        .subtitle {
+            color: #64748b;
+            margin-bottom: 24px;
+        }
+
+        .chat-box {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            min-height: 380px;
+            max-height: 55vh;
+            overflow-y: auto;
+            border: 1px solid #e2e8f0;
+        }
+
+        .message {
+            padding: 12px 15px;
+            margin: 12px 0;
+            border-radius: 12px;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            line-height: 1.5;
+        }
+
+        .user {
+            background: #e0e7ff;
+            margin-left: 15%;
+        }
+
+        .assistant {
+            background: #f1f5f9;
+            margin-right: 8%;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        select, textarea, button {
+            font: inherit;
+            border-radius: 10px;
+            padding: 12px;
+        }
+
+        select {
+            width: 210px;
+            border: 1px solid #cbd5e1;
+            background: white;
+        }
+
+        textarea {
+            flex: 1;
+            min-width: 0;
+            resize: vertical;
+            min-height: 48px;
+            border: 1px solid #cbd5e1;
+        }
+
+        button {
+            border: none;
+            background: #4f46e5;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: wait;
+        }
+
+        .status {
+            margin-top: 12px;
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                margin: 10px auto;
+                padding: 12px;
+            }
+
+            .controls {
+                flex-direction: column;
+            }
+
+            select {
+                width: 100%;
+            }
+
+            .user, .assistant {
+                margin-left: 0;
+                margin-right: 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Hybrid AI Assistant</h1>
+        <p class="subtitle">
+            Chat with a local AI model or Amazon Bedrock.
+        </p>
+
+        <div id="chatBox" class="chat-box">
+            <div class="message assistant">
+                Hello! I'm your Hybrid AI Assistant.
+                Select an AI provider and ask me a question.
+            </div>
+        </div>
+
+        <div class="controls">
+            <select id="provider">
+                <option value="auto">Auto — choose automatically</option>
+                <option value="local">Local — Llama 3.2</option>
+                <option value="bedrock">Cloud — Amazon Bedrock</option>
+            </select>
+
+            <textarea
+                id="message"
+                placeholder="Type your message..."
+                rows="2"
+            ></textarea>
+
+            <button id="sendButton" onclick="sendMessage()">
+                Send
+            </button>
+        </div>
+
+        <div id="status" class="status">
+            Ready to chat.
+        </div>
+    </div>
+
+    <script>
+        async function sendMessage() {
+            const input = document.getElementById("message");
+            const provider = document.getElementById("provider").value;
+            const button = document.getElementById("sendButton");
+            const status = document.getElementById("status");
+            const chatBox = document.getElementById("chatBox");
+
+            const message = input.value.trim();
+
+            if (!message) {
+                status.textContent = "Please type a message first.";
+                return;
+            }
+
+            addMessage("You", message, "user");
+            input.value = "";
+            button.disabled = true;
+            status.textContent = "AI is thinking...";
+
+            try {
+                const response = await fetch("/chat", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        provider: provider
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(
+                        data.detail || "The request failed."
+                    );
+                }
+
+                addMessage(
+                    "AI (" + data.provider + ")",
+                    data.answer,
+                    "assistant"
+                );
+
+                status.textContent =
+                    "Response received from " + data.provider + ".";
+            } catch (error) {
+                addMessage(
+                    "Error",
+                    error.message +
+                    "\n\nCheck that the FastAPI server is running.",
+                    "assistant"
+                );
+
+                status.textContent = "Request failed.";
+            } finally {
+                button.disabled = false;
+                input.focus();
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+        }
+
+        function addMessage(sender, text, type) {
+            const chatBox = document.getElementById("chatBox");
+            const messageElement = document.createElement("div");
+
+            messageElement.className = "message " + type;
+            messageElement.textContent = sender + ":\n" + text;
+
+            chatBox.appendChild(messageElement);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        document.getElementById("message").addEventListener(
+            "keydown",
+            function(event) {
+                if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    sendMessage();
+                }
+            }
+        );
+    </script>
+</body>
+</html>
